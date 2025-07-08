@@ -128,7 +128,7 @@ public class UIManager : MonoBehaviour
         {
             targetFade.FadeIn(() =>  // 콜백을 넘김
             {
-                Debug.Log("[UIManager] 새 패널 FadeIn 완료");
+                Debug.Log("[UIManager] 새 패널 FadeIn 완료 - isTransitioning false로 변경");
                 isTransitioning = false;  // FadeIn 완료 시점에 상태 해제
             });
         }
@@ -137,7 +137,6 @@ public class UIManager : MonoBehaviour
             targetPanel.Show();
             isTransitioning = false;
         }
-
     }
 }
 
