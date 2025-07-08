@@ -7,6 +7,8 @@ public class UIManager : MonoBehaviour
     [Header("All UIPanels")]
     [SerializeField] private List<MonoBehaviour> panelScripts = new List<MonoBehaviour>();
 
+    private bool isTransitioning = false;
+    
     private List<IUIPanel> panels = new List<IUIPanel>();
     private Stack<IUIPanel> panelStack = new Stack<IUIPanel>(); // Stack 기능 추가 -- 뒤로가기
 
@@ -33,60 +35,153 @@ public class UIManager : MonoBehaviour
     
     /// 지정된 패털 표시, 다른 패널 비활성화
     public void ShowPanel<T>() where T : IUIPanel
+{
+    if (isTransitioning)
+        return; // 전환 중이면 무시
+
+    // 현재 보여야 할 패널 찾기
+    IUIPanel targetPanel = null;
+    foreach(var panel in panels)
     {
-        foreach (var panel in panels)
+        if (panel is T)
         {
-            Debug.Log($"[UIManager] panel type: {panel.GetType().Name}");
+            targetPanel = panel;
+            break;
+        }
+    }
 
-            if (panel is T)
+    if (targetPanel == null)
+    {
+        Debug.LogWarning($"패널 {typeof(T).Name}을 찾을 수 없음");
+        return;
+    }
+
+    if (panelStack.Count > 0 && panelStack.Peek() == targetPanel)
+    {
+        // 이미 최상단 패널이면 그냥 FadeIn 시도
+        var fade = ((MonoBehaviour)targetPanel).GetComponent<UIFadeController>();
+        if (fade != null) fade.FadeIn();
+        else targetPanel.Show();
+        return;
+    }
+
+    isTransitioning = true;
+
+    // 이전 패널 FadeOut
+    if (panelStack.Count > 0)
+    {
+        var currentPanel = panelStack.Peek();
+        var currentFade = ((MonoBehaviour)currentPanel).GetComponent<UIFadeController>();
+
+        Action afterFadeOut = () =>
+        {
+            panelStack.Pop();
+            panelStack.Push(targetPanel);
+
+            var targetGO = ((MonoBehaviour)targetPanel).gameObject;
+            targetGO.SetActive(true);
+
+            var targetFade = targetGO.GetComponent<UIFadeController>();
+            if (targetFade != null)
             {
-                Debug.Log($"[UIManager] --> Matched: {typeof(T)} == {panel.GetType().Name}");
-                // 현재 패널이랑 같지 않을 때만 스택에 넣기
-                if (panelStack.Count == 0 || panelStack.Peek() == panel)
-                {
-                    if (panelStack.Count > 0)
-                    {
-                        panelStack.Peek().Hide();
-                    }
-
-                    panelStack.Push(panel); // 스택에 새 패널 추가
-                }
-
-                panel.Show();
+                targetFade.FadeIn();
+                // FadeIn 끝나면 전환 끝
+                // DOTween은 OnComplete로 따로 처리 가능
+                // 여기선 임시로 코루틴 등으로 처리 가능
+                // 또는 FadeIn에 콜백 추가해서 처리
+                isTransitioning = false;
             }
             else
             {
-                Debug.Log($"[UIManager] --> Not matched: {panel.GetType().Name}");
-                panel.Hide();
+                targetPanel.Show();
+                isTransitioning = false;
             }
-        }
+        };
 
+        if (currentFade != null)
+            currentFade.FadeOut(afterFadeOut);
+        else
+        {
+            currentPanel.Hide();
+            afterFadeOut();
+        }
     }
+    else
+    {
+        panelStack.Push(targetPanel);
+        var targetGO = ((MonoBehaviour)targetPanel).gameObject;
+        targetGO.SetActive(true);
+
+        var targetFade = targetGO.GetComponent<UIFadeController>();
+        if (targetFade != null)
+        {
+            targetFade.FadeIn();
+            isTransitioning = false;
+        }
+        else
+        {
+            targetPanel.Show();
+            isTransitioning = false;
+        }
+    }
+}
+
+
     
     /// 모든 패널 비활성화
     public void HideAllPanels()
     {
         foreach (var panel in panels)
         {
-            panel.Hide();
+            var fade = ((MonoBehaviour)panel).GetComponent<UIFadeController>();
+            if (fade != null) fade.FadeOut();
+            else panel.Hide();
         }
     }
-    
-    public void Back() // 기능 추가
-    {
-        if (panelStack.Count > 0)
-        {
-            // 현재 패널 숨기기
-            var current = panelStack.Pop();
-            current.Hide();
 
-            // 이전 패널 보여주기
-            if (panelStack.Count > 0)
+    
+    public void Back()
+    {
+        if (isTransitioning)
+            return;
+
+        if (panelStack.Count == 0)
+            return;
+
+        isTransitioning = true;
+
+        var current = panelStack.Pop();
+        var currentFade = ((MonoBehaviour)current).GetComponent<UIFadeController>();
+
+        Action showPrevious = () =>
+        {
+            if (panelStack.Count == 0)
             {
-                var previous = panelStack.Peek();
-                previous.Show();
+                isTransitioning = false;
+                return;
             }
+
+            var previous = panelStack.Peek();
+            var previousFade = ((MonoBehaviour)previous).GetComponent<UIFadeController>();
+
+            if (previousFade != null)
+                previousFade.FadeIn(() => { isTransitioning = false; });
+            else
+            {
+                previous.Show();
+                isTransitioning = false;
+            }
+        };
+
+        if (currentFade != null)
+            currentFade.FadeOut(showPrevious);
+        else
+        {
+            current.Hide();
+            showPrevious();
         }
     }
+
+
 
 }
