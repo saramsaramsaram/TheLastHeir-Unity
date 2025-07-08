@@ -123,20 +123,21 @@ public class UIManager : MonoBehaviour
         Debug.Log("[UIManager] 첫 패널 활성화");
 
         var targetFade = targetGO.GetComponent<UIFadeController>();
+        
         if (targetFade != null)
         {
-            targetFade.FadeIn(() =>
+            targetFade.FadeIn(() =>  // 콜백을 넘김
             {
-                Debug.Log("[UIManager] 첫 패널 FadeIn 완료");
-                isTransitioning = false;
+                Debug.Log("[UIManager] 새 패널 FadeIn 완료");
+                isTransitioning = false;  // FadeIn 완료 시점에 상태 해제
             });
         }
         else
         {
             targetPanel.Show();
-            Debug.Log("[UIManager] 첫 패널 Show() 호출 완료");
             isTransitioning = false;
         }
+
     }
 }
 
