@@ -35,110 +35,111 @@ public class UIManager : MonoBehaviour
     
     /// 지정된 패털 표시, 다른 패널 비활성화
     public void ShowPanel<T>() where T : IUIPanel
-{
-    if (isTransitioning)
     {
-        Debug.Log("[UIManager] Transition in progress. ShowPanel ignored.");
-        return; // 전환 중이면 무시
-    }
-
-
-    // 현재 보여야 할 패널 찾기
-    IUIPanel targetPanel = null;
-    foreach(var panel in panels)
-    {
-        if (panel is T)
+        if (isTransitioning)
         {
-            targetPanel = panel;
-            break;
+            Debug.Log("[UIManager] Transition in progress. ShowPanel ignored.");
+            return; // 전환 중이면 무시
         }
-    }
 
-    if (targetPanel == null)
-    {
-        Debug.LogWarning($"[UIManager] 패널 {typeof(T).Name}을 찾을 수 없음");
-        return;
-    }
 
-    if (panelStack.Count > 0 && panelStack.Peek() == targetPanel)
-    {
-        Debug.Log($"[UIManager] 이미 최상단 패널 {typeof(T).Name} 입니다. FadeIn 시도.");
-        var fade = ((MonoBehaviour)targetPanel).GetComponent<UIFadeController>();
-        if (fade != null) fade.FadeIn(() => Debug.Log("[UIManager] FadeIn 완료"));
+        // 현재 보여야 할 패널 찾기
+        IUIPanel targetPanel = null;
+        foreach(var panel in panels)
+        {
+            if (panel is T)
+            {
+                targetPanel = panel;
+                break;
+            }
+        }
+
+        if (targetPanel == null)
+        {
+            Debug.LogWarning($"[UIManager] 패널 {typeof(T).Name}을 찾을 수 없음");
+            return;
+        }
+
+        if (panelStack.Count > 0 && panelStack.Peek() == targetPanel)
+        {
+            Debug.Log($"[UIManager] 이미 최상단 패널 {typeof(T).Name} 입니다. FadeIn 시도.");
+            var fade = ((MonoBehaviour)targetPanel).GetComponent<UIFadeController>();
+            if (fade != null) fade.FadeIn(() => Debug.Log("[UIManager] FadeIn 완료"));
+            else
+            {
+                targetPanel.Show();
+                Debug.Log("[UIManager" + "] Show() 호출 완료");
+            }
+            return;
+        }
+
+        isTransitioning = true;
+        Debug.Log($"[UIManager] ShowPanel 시작 - 이전 패널 FadeOut 시도");
+
+        // 이전 패널 FadeOut
+        if (panelStack.Count > 0)
+        {
+            var currentPanel = panelStack.Peek();
+            var currentFade = ((MonoBehaviour)currentPanel).GetComponent<UIFadeController>();
+
+            Action afterFadeOut = () =>
+            {
+                Debug.Log("[UIManager] 이전 패널 FadeOut 완료");
+                panelStack.Pop();
+                panelStack.Push(targetPanel);
+
+                var targetGO = ((MonoBehaviour)targetPanel).gameObject;
+                targetGO.SetActive(true);
+                Debug.Log("[UIManager] 새 패널 활성화");
+
+                var targetFade = targetGO.GetComponent<UIFadeController>();
+                if (targetFade != null)
+                {
+                    targetFade.FadeIn();
+                    Debug.Log("[UIManager] 새 패널 FadeIn 완료");
+                    isTransitioning = false;
+                }
+                else
+                {
+                    targetPanel.Show();
+                    isTransitioning = false;
+                }
+            };
+
+            if (currentFade != null)
+                currentFade.FadeOut(afterFadeOut);
+            else
+            {
+                Debug.Log("[UIManager] 이전 패널 Hide() 호출 완료");
+                currentPanel.Hide();
+                afterFadeOut();
+            }
+        }
         else
         {
-            targetPanel.Show();
-            Debug.Log("[UIManager" + "] Show() 호출 완료");
-        }
-        return;
-    }
-
-    isTransitioning = true;
-    Debug.Log($"[UIManager] ShowPanel 시작 - 이전 패널 FadeOut 시도");
-
-    // 이전 패널 FadeOut
-    if (panelStack.Count > 0)
-    {
-        var currentPanel = panelStack.Peek();
-        var currentFade = ((MonoBehaviour)currentPanel).GetComponent<UIFadeController>();
-
-        Action afterFadeOut = () =>
-        {
-            Debug.Log("[UIManager] 이전 패널 FadeOut 완료");
-            panelStack.Pop();
             panelStack.Push(targetPanel);
-
             var targetGO = ((MonoBehaviour)targetPanel).gameObject;
             targetGO.SetActive(true);
-            Debug.Log("[UIManager] 새 패널 활성화");
+            Debug.Log("[UIManager] 첫 패널 활성화");
 
             var targetFade = targetGO.GetComponent<UIFadeController>();
+            
             if (targetFade != null)
             {
-                targetFade.FadeIn();
-                Debug.Log("[UIManager] 새 패널 FadeIn 완료");
-                isTransitioning = false;
+                targetFade.FadeIn(() =>
+                {
+                    Debug.Log("[UIManager] 새 패널 FadeIn 완료");
+                    isTransitioning = false; // 애니메이션 끝나면 플래그 해제
+                });
             }
             else
             {
                 targetPanel.Show();
                 isTransitioning = false;
             }
-        };
 
-        if (currentFade != null)
-            currentFade.FadeOut(afterFadeOut);
-        else
-        {
-            Debug.Log("[UIManager] 이전 패널 Hide() 호출 완료");
-            currentPanel.Hide();
-            afterFadeOut();
         }
     }
-    else
-    {
-        panelStack.Push(targetPanel);
-        var targetGO = ((MonoBehaviour)targetPanel).gameObject;
-        targetGO.SetActive(true);
-        Debug.Log("[UIManager] 첫 패널 활성화");
-
-        var targetFade = targetGO.GetComponent<UIFadeController>();
-        
-        if (targetFade != null)
-        {
-            targetFade.FadeIn(() =>  // 콜백을 넘김
-            {
-                Debug.Log("[UIManager] 새 패널 FadeIn 완료 - isTransitioning false로 변경");
-                isTransitioning = false;  // FadeIn 완료 시점에 상태 해제
-            });
-        }
-        else
-        {
-            targetPanel.Show();
-            isTransitioning = false;
-        }
-    }
-}
 
 
     
