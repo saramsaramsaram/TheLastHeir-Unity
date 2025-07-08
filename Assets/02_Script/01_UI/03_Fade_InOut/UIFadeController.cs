@@ -56,11 +56,13 @@ public class UIFadeController : MonoBehaviour
 
         currentTween = canvasGroup.DOFade(0f, duration).OnComplete(() =>
         {
+            Debug.Log($"UIFadeController: FadeOut 완료 콜백 호출 - {gameObject.name}");
             canvasGroup.interactable = false;
             canvasGroup.blocksRaycasts = false;
             gameObject.SetActive(false);
             onComplete?.Invoke();
         });
     }
+
 
 }
