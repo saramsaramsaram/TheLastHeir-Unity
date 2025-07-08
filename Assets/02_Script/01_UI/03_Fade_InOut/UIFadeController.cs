@@ -20,6 +20,7 @@ public class UIFadeController : MonoBehaviour
     {
         if (canvasGroup == null)
         {
+            Debug.LogWarning("FadeIn 실패: CanvasGroup 없음");
             onComplete?.Invoke();
             return;
         }
@@ -34,9 +35,12 @@ public class UIFadeController : MonoBehaviour
 
         currentTween = canvasGroup.DOFade(1f, duration).OnComplete(() =>
         {
+            Debug.Log("UIFadeController: FadeIn 완료 콜백 호출");
             onComplete?.Invoke();
         });
     }
+
+
 
     public void FadeOut(Action onComplete = null)
     {
