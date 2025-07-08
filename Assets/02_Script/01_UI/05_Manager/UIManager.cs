@@ -8,6 +8,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private List<MonoBehaviour> panelScripts = new List<MonoBehaviour>();
 
     private List<IUIPanel> panels = new List<IUIPanel>();
+    private Stack<IUIPanel> panelStack = new Stack<IUIPanel>(); // Stack 기능 추가 -- 뒤로가기
 
     private void Awake()
     {
@@ -40,6 +41,17 @@ public class UIManager : MonoBehaviour
             if (panel is T)
             {
                 Debug.Log($"[UIManager] --> Matched: {typeof(T)} == {panel.GetType().Name}");
+                // 현재 패널이랑 같지 않을 때만 스택에 넣기
+                if (panelStack.Count == 0 || panelStack.Peek() == panel)
+                {
+                    if (panelStack.Count > 0)
+                    {
+                        panelStack.Peek().Hide();
+                    }
+
+                    panelStack.Push(panel); // 스택에 새 패널 추가
+                }
+
                 panel.Show();
             }
             else
@@ -59,4 +71,22 @@ public class UIManager : MonoBehaviour
             panel.Hide();
         }
     }
+    
+    public void Back() // 기능 추가
+    {
+        if (panelStack.Count > 0)
+        {
+            // 현재 패널 숨기기
+            var current = panelStack.Pop();
+            current.Hide();
+
+            // 이전 패널 보여주기
+            if (panelStack.Count > 0)
+            {
+                var previous = panelStack.Peek();
+                previous.Show();
+            }
+        }
+    }
+
 }
