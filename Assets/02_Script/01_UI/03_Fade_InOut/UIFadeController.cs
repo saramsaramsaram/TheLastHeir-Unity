@@ -24,6 +24,7 @@ public class UIFadeController : MonoBehaviour
             return;
         }
 
+        // 기존에 실행 중인 Tween이 있으면 종료시키기 (중복 애니메이션 방지)
         if (currentTween != null && currentTween.IsActive())
             currentTween.Kill();
 
@@ -48,6 +49,7 @@ public class UIFadeController : MonoBehaviour
             return;
         }
 
+        // 기존에 실행 중인 Tween이 있으면 종료시키기 (중복 애니메이션 방지)
         if (currentTween != null && currentTween.IsActive())
             currentTween.Kill();
 
