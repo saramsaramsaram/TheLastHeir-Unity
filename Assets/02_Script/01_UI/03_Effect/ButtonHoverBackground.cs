@@ -7,13 +7,11 @@ public class ButtonHoverBackground : MonoBehaviour, IPointerEnterHandler, IPoint
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (hoverBackground != null)
-            hoverBackground.SetActive(true);
+        hoverBackground?.SetActive(true);
     }
 
     public void OnPointerExit(PointerEventData eventData)
-    {
-        if (hoverBackground != null)
-            hoverBackground.SetActive(false);
+    { 
+        hoverBackground?.SetActive(false);
     }
 }
