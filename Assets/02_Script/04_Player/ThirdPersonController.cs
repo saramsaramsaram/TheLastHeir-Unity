@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 public class ThirdPersonController : MonoBehaviour
 {
@@ -128,7 +128,7 @@ public class ThirdPersonController : MonoBehaviour
             StartRoll();
         }
 
-        if (Input.GetMouseButtonDown(0) && !isRolling && !isBlocking && !isAttacking)
+        if (Input.GetMouseButtonDown(0) && !isRolling && !isBlocking)
         {
             attackCount++;
             if (attackCount > 3) attackCount = 1;
