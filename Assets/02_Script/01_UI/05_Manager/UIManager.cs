@@ -34,7 +34,7 @@ public class UIManager : MonoBehaviour
 
     
     /// 지정된 패털 표시, 다른 패널 비활성화
-    public void ShowPanel<T>() where T : IUIPanel
+    public void ShowPanel<T>(bool force = false) where T : IUIPanel
     {
         if (isTransitioning)
         {
@@ -60,7 +60,7 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        if (panelStack.Count > 0 && panelStack.Peek() == targetPanel)
+        if (!force && panelStack.Count > 0 && panelStack.Peek() == targetPanel)
         {
             Debug.Log($"[UIManager] 이미 최상단 패널 {typeof(T).Name} 입니다. FadeIn 시도.");
             var fade = ((MonoBehaviour)targetPanel).GetComponent<UIFadeController>();
@@ -89,18 +89,31 @@ public class UIManager : MonoBehaviour
                 panelStack.Push(targetPanel);
 
                 var targetGO = ((MonoBehaviour)targetPanel).gameObject;
-                targetGO.SetActive(true);
-                Debug.Log("[UIManager] 새 패널 활성화");
-
+                
+                // Fade In 오류 발생 -> 먼저 활성화
+                if (!targetGO.activeSelf)
+                {
+                    Debug.Log("[UIManager] 새 패널 활성화");   
+                    targetGO.SetActive(true);
+                }  
+                
+                // 활성화 후 컴포넌트 가져옴
                 var targetFade = targetGO.GetComponent<UIFadeController>();
+                
+                // 불필요한 조건문 삭제
                 if (targetFade != null)
                 {
-                    targetFade.FadeIn();
-                    Debug.Log("[UIManager] 새 패널 FadeIn 완료");
-                    isTransitioning = false;
+                    // FadeIn 호출, 콜백에서 플래그 해제
+                    targetFade.FadeIn(() =>
+                    {
+                        Debug.Log("[UIManager] 새 패널 FadeIn 완료");
+                        isTransitioning = false;
+                    });
                 }
                 else
                 {
+                    // FadeController가 없으면 Show()로 대체
+                    Debug.LogWarning("[UIManager] UIFadeController 없음 → Show()로 대체");
                     targetPanel.Show();
                     isTransitioning = false;
                 }
