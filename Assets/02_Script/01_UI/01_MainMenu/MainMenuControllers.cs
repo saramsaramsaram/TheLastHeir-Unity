@@ -35,7 +35,7 @@ public class MainMenuController : MonoBehaviour, IUIPanel
     private void OnStartButtonClicked()
     {
         Debug.Log("Start Button Clicked!");
-        uiManager.ShowPanel<StartSettingsController>();
+        uiManager.ShowPanel<StartSettingsController>(true);
     }
 
     // Button: Open Settings
