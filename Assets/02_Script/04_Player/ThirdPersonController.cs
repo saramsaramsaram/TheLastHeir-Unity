@@ -74,20 +74,10 @@ namespace StarterAssets
         private bool _hasAnimator;
         private bool _isRolling = false;
         private bool _isAttacking = false;
-        private bool _canReceiveCombo = false;
+        private Coroutine _attackCoroutine = null;
+        private bool _canReceiveCombo = true; // 공격이 끝나면 true, 공격 중에는 false
+        private bool _attackInputBuffered = false; // 공격 중 입력 버퍼
         private int _attackCount = 0;
-
-        private bool IsCurrentDeviceMouse
-        {
-            get
-            {
-#if ENABLE_INPUT_SYSTEM
-                return _playerInput.currentControlScheme == "KeyboardMouse";
-#else
-                return false;
-#endif
-            }
-        }
 
         private void Awake()
         {
@@ -130,12 +120,18 @@ namespace StarterAssets
                 Move();
 
             AttackCheck();
+
+            // 카메라 입력 디버그 로그
+            Debug.Log($"_input.look: {_input.look}");
         }
 
         private void LateUpdate()
         {
             if (!_isRolling && !_isAttacking)
+            {
+                Debug.Log("CameraRotation 호출됨");
                 CameraRotation();
+            }
         }
 
         private void AssignAnimationIDs()
@@ -185,51 +181,67 @@ namespace StarterAssets
 
         private void AttackCheck()
         {
-
-            if (_input.attack && !_isAttacking && !_isRolling && Grounded)
+            if (_input.attack)
             {
-                _input.attack = false;
-                StartCoroutine(AttackRoutine());
-            }
-            else if (_input.attack && _isAttacking && _canReceiveCombo)
-            {
-                _input.attack = false;
-                _attackCount = Mathf.Clamp(_attackCount + 1, 0, 3);
-                _animator.SetInteger(_animIDAttackCount, _attackCount);
-                _animator.SetTrigger(_animIDAttack);
-                _canReceiveCombo = false;
+                if (_canReceiveCombo && !_isRolling && Grounded)
+                {
+                    Debug.Log("공격 입력 감지");
+                    _input.attack = false;
+                    _canReceiveCombo = false;
+                    _attackCount++;
+                    if (_attackCoroutine == null)
+                        _attackCoroutine = StartCoroutine(AttackRoutine());
+                }
+                else if (!_canReceiveCombo && !_attackInputBuffered)
+                {
+                    // 공격 중에 입력이 들어오면 한 번만 버퍼에 저장
+                    _attackInputBuffered = true;
+                    Debug.Log("공격 중 입력 버퍼링");
+                }
+                _input.attack = false; // 입력 즉시 초기화
             }
         }
 
         private IEnumerator AttackRoutine()
         {
             _isAttacking = true;
-            _attackCount = 0;
-            _canReceiveCombo = false;
-
             _animator.SetInteger(_animIDAttackCount, _attackCount);
             _animator.SetTrigger(_animIDAttack);
+            Debug.Log($"Set AttackCount: {_attackCount}");
 
             float attackDuration = 0.6f;
+            _attackInputBuffered = false; // 공격 시작할 때마다 버퍼 초기화
+
             yield return new WaitForSeconds(attackDuration);
 
             _isAttacking = false;
             _canReceiveCombo = true;
+            _attackCoroutine = null;
 
-            StartCoroutine(ComboTimer());
+
+            // 공격 중에 입력이 한 번 들어왔으면, 한 번만 추가 공격 실행
+            if (_attackInputBuffered)
+            {
+                _canReceiveCombo = false;
+                _attackCount++;
+                _attackCoroutine = StartCoroutine(AttackRoutine());
+            }
         }
 
-        private IEnumerator ComboTimer()
+        public void ResetAttackCount()
         {
-            float comboWindow = 1.0f;
-            yield return new WaitForSeconds(comboWindow);
+            _attackCount = 0;
+        }
 
-            if (_canReceiveCombo)
-            {
-                _attackCount = 0;
-                _animator.SetInteger(_animIDAttackCount, _attackCount);
-                _canReceiveCombo = false;
-            }
+        public void EnableCombo()
+        {
+            Debug.Log("EnableCombo 호출");
+            _canReceiveCombo = true;
+        }
+        public void DisableCombo()
+        {
+            Debug.Log("DisableCombo 호출");
+            _canReceiveCombo = false;
         }
         
         private void Move()
@@ -333,9 +345,10 @@ namespace StarterAssets
 
         private void CameraRotation()
         {
+            Debug.Log($"CameraRotation 진입, _input.look: {_input.look}");
             if (_input.look.sqrMagnitude >= _threshold && !LockCameraPosition)
             {
-                float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1f : Time.deltaTime;
+                float deltaTimeMultiplier = Time.deltaTime;
 
                 _cinemachineTargetYaw += _input.look.x * deltaTimeMultiplier;
                 _cinemachineTargetPitch += _input.look.y * deltaTimeMultiplier;
