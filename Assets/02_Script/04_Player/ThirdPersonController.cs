@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -42,7 +42,6 @@ namespace StarterAssets
         public float CameraAngleOverride = 0.0f;
         public bool LockCameraPosition = false;
 
-        // private variables
         private float _cinemachineTargetYaw;
         private float _cinemachineTargetPitch;
         private float _speed;
@@ -54,13 +53,14 @@ namespace StarterAssets
         private float _jumpTimeoutDelta;
         private float _fallTimeoutDelta;
 
-        // 애니메이터 해시값 (모두 선언)
         private int _animIDSpeed;
         private int _animIDGrounded;
         private int _animIDJump;
         private int _animIDFreeFall;
         private int _animIDMotionSpeed;
-        private int _animIDRoll; // 구르기 트리거
+        private int _animIDRoll;
+        private int _animIDAttack;
+        private int _animIDAttackCount;
 
 #if ENABLE_INPUT_SYSTEM
         private PlayerInput _playerInput;
@@ -72,20 +72,12 @@ namespace StarterAssets
 
         private const float _threshold = 0.01f;
         private bool _hasAnimator;
-
-        private bool _isRolling = false; // 구르기 상태 체크
-
-        private bool IsCurrentDeviceMouse
-        {
-            get
-            {
-#if ENABLE_INPUT_SYSTEM
-                return _playerInput.currentControlScheme == "KeyboardMouse";
-#else
-                return false;
-#endif
-            }
-        }
+        private bool _isRolling = false;
+        private bool _isAttacking = false;
+        private Coroutine _attackCoroutine = null;
+        private bool _canReceiveCombo = true; // 공격이 끝나면 true, 공격 중에는 false
+        private bool _attackInputBuffered = false; // 공격 중 입력 버퍼
+        private int _attackCount = 0;
 
         private void Awake()
         {
@@ -116,19 +108,30 @@ namespace StarterAssets
         {
             _hasAnimator = TryGetComponent(out _animator);
 
-            RollCheck();
+            if (!_isAttacking)
+            {
+                RollCheck();
+                JumpAndGravity();
+            }
 
-            JumpAndGravity();
             GroundedCheck();
 
-            if (!_isRolling) // 구르기 중이 아니면 이동 처리
+            if (!_isRolling && !_isAttacking)
                 Move();
+
+            AttackCheck();
+
+            // 카메라 입력 디버그 로그
+            Debug.Log($"_input.look: {_input.look}");
         }
 
         private void LateUpdate()
         {
-            if (!_isRolling) // 구르기 중이 아니면 카메라 회전 처리
+            if (!_isRolling && !_isAttacking)
+            {
+                Debug.Log("CameraRotation 호출됨");
                 CameraRotation();
+            }
         }
 
         private void AssignAnimationIDs()
@@ -138,15 +141,16 @@ namespace StarterAssets
             _animIDJump = Animator.StringToHash("Jump");
             _animIDFreeFall = Animator.StringToHash("FreeFall");
             _animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
-            _animIDRoll = Animator.StringToHash("Roll"); // Roll 트리거
+            _animIDRoll = Animator.StringToHash("Roll");
+            _animIDAttack = Animator.StringToHash("Attack");
+            _animIDAttackCount = Animator.StringToHash("AttackCount");
         }
 
         private void RollCheck()
         {
-            // 구르기 입력 && 구르기 중 아님 && 땅에 있음 && 점프중 아님
-            if (_input.roll && !_isRolling && Grounded && !_input.jump)
+            if (_input.roll && !_isRolling && Grounded && !_input.jump && !_isAttacking)
             {
-                _input.roll = false; // 입력 초기화
+                _input.roll = false;
                 StartCoroutine(RollRoutine());
             }
         }
@@ -158,12 +162,88 @@ namespace StarterAssets
             if (_hasAnimator)
                 _animator.SetTrigger(_animIDRoll);
 
-            // 구르기 애니메이션 길이에 맞게 대기 (예: 0.8초)
-            yield return new WaitForSeconds(0.8f);
+            Vector3 rollDirection = transform.forward;
+
+            float rollSpeed = 4.0f;
+            float rollDuration = 0.8f;
+
+            float timer = 0f;
+
+            while (timer < rollDuration)
+            {
+                _controller.Move(rollDirection * (rollSpeed * Time.deltaTime));
+                timer += Time.deltaTime;
+                yield return null;
+            }
 
             _isRolling = false;
         }
 
+        private void AttackCheck()
+        {
+            if (_input.attack)
+            {
+                if (_canReceiveCombo && !_isRolling && Grounded)
+                {
+                    Debug.Log("공격 입력 감지");
+                    _input.attack = false;
+                    _canReceiveCombo = false;
+                    _attackCount++;
+                    if (_attackCoroutine == null)
+                        _attackCoroutine = StartCoroutine(AttackRoutine());
+                }
+                else if (!_canReceiveCombo && !_attackInputBuffered)
+                {
+                    // 공격 중에 입력이 들어오면 한 번만 버퍼에 저장
+                    _attackInputBuffered = true;
+                    Debug.Log("공격 중 입력 버퍼링");
+                }
+                _input.attack = false; // 입력 즉시 초기화
+            }
+        }
+
+        private IEnumerator AttackRoutine()
+        {
+            _isAttacking = true;
+            _animator.SetInteger(_animIDAttackCount, _attackCount);
+            _animator.SetTrigger(_animIDAttack);
+            Debug.Log($"Set AttackCount: {_attackCount}");
+
+            float attackDuration = 0.6f;
+            _attackInputBuffered = false; // 공격 시작할 때마다 버퍼 초기화
+
+            yield return new WaitForSeconds(attackDuration);
+
+            _isAttacking = false;
+            _canReceiveCombo = true;
+            _attackCoroutine = null;
+
+
+            // 공격 중에 입력이 한 번 들어왔으면, 한 번만 추가 공격 실행
+            if (_attackInputBuffered)
+            {
+                _canReceiveCombo = false;
+                _attackCount++;
+                _attackCoroutine = StartCoroutine(AttackRoutine());
+            }
+        }
+
+        public void ResetAttackCount()
+        {
+            _attackCount = 0;
+        }
+
+        public void EnableCombo()
+        {
+            Debug.Log("EnableCombo 호출");
+            _canReceiveCombo = true;
+        }
+        public void DisableCombo()
+        {
+            Debug.Log("DisableCombo 호출");
+            _canReceiveCombo = false;
+        }
+        
         private void Move()
         {
             float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
@@ -224,7 +304,7 @@ namespace StarterAssets
                 if (_verticalVelocity < 0f)
                     _verticalVelocity = -2f;
 
-                if (_input.jump && _jumpTimeoutDelta <= 0f && !_isRolling) // 구르기 중 점프 금지
+                if (_input.jump && _jumpTimeoutDelta <= 0f && !_isRolling && !_isAttacking)
                 {
                     _verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
 
@@ -265,9 +345,10 @@ namespace StarterAssets
 
         private void CameraRotation()
         {
+            Debug.Log($"CameraRotation 진입, _input.look: {_input.look}");
             if (_input.look.sqrMagnitude >= _threshold && !LockCameraPosition)
             {
-                float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1f : Time.deltaTime;
+                float deltaTimeMultiplier = Time.deltaTime;
 
                 _cinemachineTargetYaw += _input.look.x * deltaTimeMultiplier;
                 _cinemachineTargetPitch += _input.look.y * deltaTimeMultiplier;

@@ -12,7 +12,8 @@ namespace StarterAssets
         public Vector2 look;
         public bool jump;
         public bool sprint;
-        public bool roll;  // 구르기 추가
+        public bool roll;
+        public bool attack;
 
         [Header("Movement Settings")]
         public bool analogMovement;
@@ -45,9 +46,14 @@ namespace StarterAssets
             SprintInput(value.isPressed);
         }
 
-        public void OnRoll(InputValue value)  // 구르기 입력 함수
+        public void OnRoll(InputValue value)
         {
             RollInput(value.isPressed);
+        }
+
+        public void OnAttack(InputValue value)
+        {
+            AttackInput(value.isPressed);
         }
 #endif
 
@@ -74,6 +80,11 @@ namespace StarterAssets
         public void RollInput(bool newRollState)
         {
             roll = newRollState;
+        }
+
+        public void AttackInput(bool newAttackState)
+        {
+            attack = newAttackState;
         }
 
         private void OnApplicationFocus(bool hasFocus)
