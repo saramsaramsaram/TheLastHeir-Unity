@@ -11,4 +11,9 @@ public class Menu_BGM : MonoBehaviour
         _audioSource.loop = true;
         _audioSource.Play();
     }
+
+    public void SetVolume(float volume)
+    {
+        _audioSource.volume = volume;
+    }
 }
